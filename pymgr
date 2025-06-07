@@ -16,6 +16,11 @@ $ pymgr get github                 # retrieve it back to stdout
 $ pymgr generate twitter 24        # generate and store a 24‑char random password
 $ pymgr list                       # list all entry names
 $ pymgr delete twitter             # remove an entry
+
+Notes
+-----
+* Testing password: ctf{t3st_p@$$w0rd}
+
 """
 import argparse
 import base64
@@ -37,150 +42,150 @@ SALT_BYTES = 16
 
 
 def derive_key(password: str, salt: bytes) -> bytes:
- kdf = PBKDF2HMAC(
-   algorithm=hashes.SHA256(),
-   length=32,
-   salt=salt,
-   iterations=PBKDF2_ITERS,
-   backend=default_backend(),
-   )
+  kdf = PBKDF2HMAC(
+    algorithm=hashes.SHA256(),
+    length=32,
+    salt=salt,
+    iterations=PBKDF2_ITERS,
+    backend=default_backend(),
+  )
 return base64.urlsafe_b64encode(kdf.derive(password.encode()))
 
 
- def _encrypt(obj: dict, password: str) -> dict:
- salt = secrets.token_bytes(SALT_BYTES)
- key = derive_key(password, salt)
- f = Fernet(key)
-ciphertext = f.encrypt(json.dumps(obj).encode())
- return {"salt": base64.b64encode(salt).decode(), "ct": ciphertext.decode()}
-
-
- def _decrypt(blob: dict, password: str) -> dict:
- try:
- salt = base64.b64decode(blob["salt"])
- key = derive_key(password, salt)
+def _encrypt(obj: dict, password: str) -> dict:
+  salt = secrets.token_bytes(SALT_BYTES)
+key = derive_key(password, salt)
 f = Fernet(key)
- plaintext = f.decrypt(blob["ct"].encode())
+ciphertext = f.encrypt(json.dumps(obj).encode())
+return {"salt": base64.b64encode(salt).decode(), "ct": ciphertext.decode()}
+
+
+def _decrypt(blob: dict, password: str) -> dict:
+  try:
+salt = base64.b64decode(blob["salt"])
+key = derive_key(password, salt)
+f = Fernet(key)
+plaintext = f.decrypt(blob["ct"].encode())
 return json.loads(plaintext)
- except (InvalidToken, KeyError, ValueError):
-  sys.exit("Error: bad master password or corrupted vault.")
+except (InvalidToken, KeyError, ValueError):
+sys.exit("Error: bad master password or corrupted vault.")
 
 
-  def load_vault(password: str) -> dict:
+def load_vault(password: str) -> dict:
   if not VAULT_PATH.exists():
- sys.exit("Vault not found. Run 'pymgr init' first.")
- blob = json.loads(VAULT_PATH.read_text())
- return _decrypt(blob, password)
+sys.exit("Vault not found. Run 'pymgr init' first.")
+blob = json.loads(VAULT_PATH.read_text())
+return _decrypt(blob, password)
 
 
- def save_vault(data: dict, password: str):
- blob = _encrypt(data, password)
- VAULT_PATH.write_text(json.dumps(blob))
- VAULT_PATH.chmod(0o600)
+def save_vault(data: dict, password: str):
+  blob = _encrypt(data, password)
+VAULT_PATH.write_text(json.dumps(blob))
+VAULT_PATH.chmod(0o600)
 
 
- def cmd_init(args):
+def cmd_init(args):
   if VAULT_PATH.exists():
-   sys.exit("Vault already exists; refusing to overwrite.")
-   pw1 = getpass("Set master password: ")
-   pw2 = getpass("Confirm: ")
-   if pw1 != pw2:
- sys.exit("Passwords don't match.")
-   save_vault({}, pw1)
- print(f"Vault created at {VAULT_PATH} (entries: 0)")
+    sys.exit("Vault already exists; refusing to overwrite.")
+  pw1 = getpass("Set master password: ")
+  pw2 = getpass("Confirm: ")
+  if pw1 != pw2:
+sys.exit("Passwords don't match.")
+save_vault({}, pw1)
+print(f"Vault created at {VAULT_PATH} (entries: 0)")
 
 
- def cmd_add(args):
- pw = getpass("Master password: ")
- vault = load_vault(pw)
- if args.name in vault and not args.force:
- sys.exit("Entry exists. Use --force to overwrite.")
- vault[args.name] = args.secret or getpass("New secret: ")
- save_vault(vault, pw)
- print("✔ stored.")
+def cmd_add(args):
+  pw = getpass("Master password: ")
+vault = load_vault(pw)
+if args.name in vault and not args.force:
+  sys.exit("Entry exists. Use --force to overwrite.")
+vault[args.name] = args.secret or getpass("New secret: ")
+save_vault(vault, pw)
+print("✔ stored.")
 
 
- def cmd_get(args):
- pw = getpass("Master password: ")
- vault = load_vault(pw)
- try:
+def cmd_get(args):
+  pw = getpass("Master password: ")
+vault = load_vault(pw)
+try:
   print(vault[args.name])
-  except KeyError:
-   sys.exit("Entry not found.")
+    except KeyError:
+    sys.exit("Entry not found.")
 
 
-   def cmd_list(args):
- pw = getpass("Master password: ")
- vault = load_vault(pw)
- for name in sorted(vault):
-  print(name)
+    def cmd_list(args):
+  pw = getpass("Master password: ")
+  vault = load_vault(pw)
+  for name in sorted(vault):
+    print(name)
 
 
-  def cmd_delete(args):
- pw = getpass("Master password: ")
- vault = load_vault(pw)
- try:
- del vault[args.name]
- save_vault(vault, pw)
- print("Deleted.")
- except KeyError:
- sys.exit("Entry not found.")
+    def cmd_delete(args):
+  pw = getpass("Master password: ")
+  vault = load_vault(pw)
+  try:
+  del vault[args.name]
+  save_vault(vault, pw)
+  print("Deleted.")
+except KeyError:
+  sys.exit("Entry not found.")
 
 
- def random_password(length: int) -> str:
- alphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()-_="
- return "".join(secrets.choice(alphabet) for _ in range(length))
+def random_password(length: int) -> str:
+  alphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()-_="
+return "".join(secrets.choice(alphabet) for _ in range(length))
 
 
- def cmd_generate(args):
- pw = getpass("Master password: ")
- vault = load_vault(pw)
- if args.name in vault and not args.force:
- sys.exit("Entry exists. Use --force to overwrite.")
- pwd = random_password(args.length)
- vault[args.name] = pwd
- save_vault(vault, pw)
- print(pwd)
+def cmd_generate(args):
+  pw = getpass("Master password: ")
+vault = load_vault(pw)
+if args.name in vault and not args.force:
+  sys.exit("Entry exists. Use --force to overwrite.")
+pwd = random_password(args.length)
+vault[args.name] = pwd
+save_vault(vault, pw)
+print(pwd)
 
 
- def build_parser():
+def build_parser():
   p = argparse.ArgumentParser(description="Minimal encrypted password manager")
   sub = p.add_subparsers(dest="cmd", required=True)
 
- s = sub.add_parser("init", help="create a new vault")
+s = sub.add_parser("init", help="create a new vault")
 s.set_defaults(func=cmd_init)
 
- s = sub.add_parser("add", help="add or update an entry")
- s.add_argument("name")
- s.add_argument("secret", nargs="?", help="password or token; if omitted you will be prompted")
- s.add_argument("--force", action="store_true", help="overwrite without asking")
+s = sub.add_parser("add", help="add or update an entry")
+s.add_argument("name")
+s.add_argument("secret", nargs="?", help="password or token; if omitted you will be prompted")
+s.add_argument("--force", action="store_true", help="overwrite without asking")
 s.set_defaults(func=cmd_add)
 
- s = sub.add_parser("get", help="retrieve an entry")
- s.add_argument("name")
+s = sub.add_parser("get", help="retrieve an entry")
+s.add_argument("name")
 s.set_defaults(func=cmd_get)
 
- s = sub.add_parser("list", help="list all entry names")
+s = sub.add_parser("list", help="list all entry names")
 s.set_defaults(func=cmd_list)
 
- s = sub.add_parser("delete", help="remove an entry")
- s.add_argument("name")
+s = sub.add_parser("delete", help="remove an entry")
+s.add_argument("name")
 s.set_defaults(func=cmd_delete)
 
- s = sub.add_parser("generate", help="generate and store a random password")
- s.add_argument("name")
- s.add_argument("length", type=int, nargs="?", default=16, help="password length (default: 16)")
- s.add_argument("--force", action="store_true")
+s = sub.add_parser("generate", help="generate and store a random password")
+s.add_argument("name")
+s.add_argument("length", type=int, nargs="?", default=16, help="password length (default: 16)")
+s.add_argument("--force", action="store_true")
 s.set_defaults(func=cmd_generate)
 
- return p
+return p
 
 
- def main():
- parser = build_parser()
- args = parser.parse_args()
- args.func(args)
+def main():
+  parser = build_parser()
+args = parser.parse_args()
+args.func(args)
 
 
- if __name__ == "__main__":
+if __name__ == "__main__":
 main()

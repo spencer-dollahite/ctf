@@ -19,7 +19,7 @@ $ pymgr delete twitter             # remove an entry
 
 Notes
 -----
-* Testing password: ctf{t3st_p@$$w0rd}
+* Removed password
 
 """
 import argparse
@@ -110,11 +110,11 @@ def cmd_get(args):
 vault = load_vault(pw)
 try:
   print(vault[args.name])
-    except KeyError:
-    sys.exit("Entry not found.")
+  except KeyError:
+  sys.exit("Entry not found.")
 
 
-    def cmd_list(args):
+  def cmd_list(args):
   pw = getpass("Master password: ")
   vault = load_vault(pw)
   for name in sorted(vault):

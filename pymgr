@@ -189,3 +189,8 @@ args.func(args)
 
 if __name__ == "__main__":
 main()
+
+# Security Note
+# Credentials should never be hardcoded or committed to version control. 
+# Even if removed later, credentials remain visible in Git commit history.
+# While in real life the best way to identify this would be to message the developer directly, this is a fun way to explore uisng github. 
